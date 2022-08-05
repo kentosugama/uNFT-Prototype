@@ -1,7 +1,8 @@
+import Bool "mo:base/Bool";
 import ExtRoute "Ext/Route";
 import ExtServices "Ext/Services";
 import ExtSub "Ext/Sub";
-import Messages "Env/Messages";
+import Msg "Env/Messages";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 
@@ -10,7 +11,6 @@ shared ({ caller = _installer }) actor class Routing() = this {
 // =============================================================== //
 // Type Definitions                                                // 
 // =============================================================== //
-  type NONE = ExtRoute.NONE;
   type Baseline = ExtRoute.Baseline;
   type Routes = ExtRoute.Routes;
   type Services = ExtRoute.Services;
@@ -19,17 +19,15 @@ shared ({ caller = _installer }) actor class Routing() = this {
   type Subscribers = ExtSub.Subscribers;
   type Subscriptions = ExtSub.Subscriptions;
 
-  type Msg = Messages.Routing;
-
 // =============================================================== //
 // One-Time Programmable                                           // 
 // =============================================================== //
   private stable var _INIT_ : Bool = false;
-  private stable let _SERVICE_ID_ : Text = NONE;
-  private stable var _CANISTER_ID_ : Text = NONE;
-  private stable var _REGISTRY_ : Text = NONE;
-  private stable var _EVENTS_ : Text = NONE;
-  private stable var _ASSETS_ : Text = NONE;
+  private stable var _SERVICE_ID_ : Text = "none";
+  private stable var _CANISTER_ID_ : Text = "none";
+  private stable var _REGISTRY_ : Text = "none";
+  private stable var _EVENTS_ : Text = "none";
+  private stable var _ASSETS_ : Text = "none";
 
 // =============================================================== //
 // Stable Memory                                                   //
@@ -55,7 +53,7 @@ shared ({ caller = _installer }) actor class Routing() = this {
     _CANISTER_ID_ := Principal.toText( Principal.fromActor(this) );
 
     // The routing table must contain actor references for the core services
-    _routing_table_stable := ExtRoute.RoutingTable( bl.routes, bl.services );
+    _routing_table := ExtRoute.RoutingTable( bl.routes, bl.services );
     assert _routing_table.isSupported( ExtServices.routing );
     assert _routing_table.isSupported( ExtServices.assets );
     assert _routing_table.isSupported( ExtServices.registry );
@@ -70,17 +68,19 @@ shared ({ caller = _installer }) actor class Routing() = this {
     _ASSETS_ := _routing_table.getActorReference( ExtServices.assets );
     _EVENTS_ := _routing_table.getActorReference( ExtServices.events );
     _rules := ExtRoute.Rules( _routing_table.getRoutes( _CANISTER_ID_ ) );
-    _committed_baseline := bl;
+    _stable_baseline := bl;
     _INIT_ := true;
   };
 
   // Reset canister to known-good state                                           
   public shared ({caller}) func reset() : async () {
     assert _rules.permit( caller, Msg.reset );
-    _routing_table := ExtRoute.RoutingTable( _committed_baseline.routes, _committed_baseline.services );
-    _rules := ExtRoute.Rules( _routing_table.getActorReference( _CANISTER_ID_ ) );
+    _routing_table := ExtRoute.RoutingTable( _stable_baseline.routes, _stable_baseline.services );
+    _rules := ExtRoute.Rules( _routing_table.getRoutes( _CANISTER_ID_ ) );
   };   
 
+  // TODO : write upload() method to import baseline and publish new routes
+  
   // Commit active baseline to stable memory
   public shared ({caller}) func commit() : async Baseline {
     assert _rules.permit( caller, Msg.commit );
@@ -100,7 +100,7 @@ shared ({ caller = _installer }) actor class Routing() = this {
   // Called by client services that no longer require routing updates
   public shared ({caller}) func unsubscribe( s : Subscriber ) : async () {
     assert  _rules.permit( caller, Msg.unsubscribe );
-    if ( Principal.equal( caller, s.sub ) ) { _subscriptions.delete(s) };
+    if ( Text.equal( Principal.toText(caller), s.sub ) ) { _subscriptions.delete(s) };
   };
 
   // Periodically called by the local service manager
@@ -122,7 +122,7 @@ shared ({ caller = _installer }) actor class Routing() = this {
   // Exports the active baseline
   public shared query ({caller}) func download() : async Baseline {
     assert _rules.permit( caller, Msg.download );
-    _active_baseline();
+    _activeBaseline();
   };
 
   // Exports an array of routes for a given actor (from active baseline)
@@ -132,7 +132,7 @@ shared ({ caller = _installer }) actor class Routing() = this {
   };
 
   // Exports an array of supported services (from active baseline)
-  public shared query ({caller}) func services() : async Services {
+  public shared query ({caller}) func services() : async [Text] {
     assert _rules.permit( caller, Msg.actors );
     _routing_table.supported();
   };
@@ -140,7 +140,7 @@ shared ({ caller = _installer }) actor class Routing() = this {
   // Exports an array of trusted actors (from active baseline)
   public shared query ({caller}) func nodes() : async [Text] {
     assert _rules.permit( caller, Msg.nodes );
-    _trusted_nodes.vals();
+    _routing_table.getServiceNodes();
   };
 
   // Exports an array of current subscribers
@@ -153,17 +153,15 @@ shared ({ caller = _installer }) actor class Routing() = this {
   // Private Methods                                                 //
   // --------------------------------------------------------------- //
 
-  func _publishBaseline() : () {
-    for ( sub in _subscriptions.subscribers() ) {
-      let t_routes : Routes = _routing_table.getRoutes( sub.sub );
-      await sub.callback( t_routes ); // TODO catch errors and respond accordingly
-    };
+  func _publish( s : Subscriber ) : async () {
+    let t_routes : Routes = _routing_table.getRoutes( s.sub );
+    s.callback(t_routes ); // TODO catch errors and respond accordingly
   };
 
   func _activeBaseline() : Baseline {
     return {
       services = _routing_table.exportServices();
-      routes = _routing_table.exportRoutes();
+      routes = _routing_table.exportEntries();
       subscribers = _subscriptions.export();
     };
   };

@@ -1,6 +1,7 @@
 import Bool "mo:base/Bool";
 import Principal "mo:base/Principal";
 import Int "mo:base/Int";
+import List "mo:base/List";
 import Iter "mo:base/Iter";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
@@ -23,7 +24,7 @@ module {
   public type Baseline = {
     routes : RTEntries;
     services : Services;
-    subscribers : Sub.Subcribers;
+    subscribers : Sub.Subscribers;
   };
 
   public let emptyBaseline = { routes = []; services = []; subscribers = [] };
@@ -89,21 +90,28 @@ module {
 
     public func deleteRoutes( p : Text  ) : () { _map1.delete(p) };
     public func replaceRoutes( p : Text, r : Routes ) : () { _map1.put(p, r) };
-    public func exportRoutes() : RTEntries { _map1.entries() };
+    public func exportEntries() : RTEntries { Iter.toArray( _map1.entries() ) };
     public func getRoutes( p : Text ) : Routes { Option.get( _map1.get(p), [] ) };
 
-    public func deleteService( s : Nat ) : () { _map2.delete(s) };
-    public func replaceService( s : Nat, t : Text ) : () { _map.put(s, t) };
-    public func exportServices() : Services { _map2.entries() };
-    public func getActorReference( s : Nat ) : Text { Option.get( _map2.get(s), NONE ) };
+    public func deleteService( s : Text ) : () { _map2.delete(s) };
+    public func replaceService( s : Text, ar : Text ) : () { _map2.put(s, ar) };
+    public func exportServices() : Services { Iter.toArray(_map2.entries()) };
+    public func getActorReference( s : Text ) : Text { Option.get( _map2.get(s), NONE ) };
 
-    public func getServiceId( p : Text ) : [Nat] {
-      Iter.filter( _map2.entries(), func ( x : (Nat, Text) ) : Bool { if ( Nat.equal( x.0, p ) ) { x.1} } );
+    public func getServiceId( ar : Text ) : Text {
+      let x : List.List<Service> = Iter.toList( _map2.entries() ); 
+      let y : ?Service = List.find<Service>( x, func (x : Service ) : Bool { Text.equal(x.1, ar) } );
+      switch( y) {
+        case( ?z ) {z.0};
+        case(_) {NONE};
+      };
     };
 
-    public func supported() : [Nat] { _map2.keys() };
+    public func getServiceNodes() : [Text] { Iter.toArray( _map2.vals() ) };
 
-    public func isSupported( s: Nat ) : Bool { Option.isSome( _map2.get(s) ) };
+    public func supported() : [Text] { Iter.toArray( _map2.keys() ) };
+
+    public func isSupported( s: Text ) : Bool { Option.isSome( _map2.get(s) ) };
 
     public func clear() : () {
       _map1 := TrieMap.TrieMap<Text, Routes>( Text.equal, Text.hash );
