@@ -5,14 +5,16 @@ import Principal "mo:base/Principal";
 import Hash "mo:base/Hash";
 import Trie "mo:base/Trie";
 import TrieSet "mo:base/TrieSet";
+import ExtRoute "Route";
 
 
 module {  
   
-  public type Route = {
-    from : Text;
-    msg : Nat;
-  };
+  public type Route = ExtRoute.Route;
+  // public type Route = {
+  //   from : Text;
+  //   msg : Nat;
+  // };
   
   public type Routes = [Route];
   public type Subscribers = [ Subscriber ];

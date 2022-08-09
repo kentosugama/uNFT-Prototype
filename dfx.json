@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "dfx": "0.11.0",
+  "canisters": {
+    "Sub": {
+      "type": "motoko",
+      "main": "src/Ext/Sub.mo"
+    }
+  }
+}
