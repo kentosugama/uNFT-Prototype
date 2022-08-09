@@ -1,3 +1,3 @@
 # uNFT Prototype
 
-This repository will be used to baseline updates to the micro-NFT (uNFT) prototype.
+Reproducing circular import bug found here: https://forum.dfinity.org/t/rosetta-error-during-canister-build/14686
